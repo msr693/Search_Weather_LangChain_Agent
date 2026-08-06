@@ -61,15 +61,11 @@ class StreamlitVerboseCallbackHandler(BaseCallbackHandler):
 # Agent setup (cached so it's only built once per session)
 # --------------------------------------------------------------------------- #
 @st.cache_resource(show_spinner=False)
-def build_agent_executor(openai_api_key: str, tavily_api_key: str, model: str, temperature: float, max_tokens: int):
-    os.environ["OPENAI_API_KEY"] = openai_api_key
-    os.environ["TAVILY_API_KEY"] = tavily_api_key
-
+def build_agent_executor(model: str, temperature: float, max_tokens: int):
     search_tool = TavilySearchResults(max_results=2)
 
     llm = ChatOpenAI(
         model=model,
-        api_key=openai_api_key,
         temperature=temperature,
         max_tokens=max_tokens,
     )
@@ -87,17 +83,6 @@ def build_agent_executor(openai_api_key: str, tavily_api_key: str, model: str, t
 # --------------------------------------------------------------------------- #
 with st.sidebar:
     st.header("⚙️ Configuration")
-
-    openai_api_key = st.text_input(
-        "OpenAI API Key",
-        value=os.getenv("OPENAI_API_KEY", ""),
-        type="password",
-    )
-    tavily_api_key = st.text_input(
-        "Tavily API Key",
-        value=os.getenv("TAVILY_API_KEY", ""),
-        type="password",
-    )
 
     model = st.selectbox(
         "Model",
@@ -125,8 +110,12 @@ st.caption("A Streamlit front-end for the ReAct agent defined in `main.py`, with
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if not openai_api_key or not tavily_api_key:
-    st.warning("Please provide both an OpenAI API key and a Tavily API key in the sidebar to get started.")
+if not os.getenv("OPENAI_API_KEY") or not os.getenv("TAVILY_API_KEY"):
+    st.error(
+        "Missing API keys. Set `OPENAI_API_KEY` and `TAVILY_API_KEY` as environment "
+        "variables (e.g. in a `.env` file locally, or in your deployment platform's "
+        "secrets/config) before running this app."
+    )
     st.stop()
 
 # Render chat history
@@ -151,9 +140,7 @@ if user_input:
 
         with st.spinner("Thinking..."):
             try:
-                agent_executor = build_agent_executor(
-                    openai_api_key, tavily_api_key, model, temperature, max_tokens
-                )
+                agent_executor = build_agent_executor(model, temperature, max_tokens)
                 # verbose=True on the AgentExecutor keeps printing to the terminal
                 # as before; this callback mirrors the same events live into the UI.
                 response = agent_executor.invoke(
